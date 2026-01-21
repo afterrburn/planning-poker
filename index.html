@@ -408,7 +408,7 @@
       // Add user to room
       roomRef.child('users/' + odId).set({
         name: myName,
-        odId: currentUser.odId,
+        odId: currentUser.uid,
         vote: null,
         joinedAt: firebase.database.ServerValue.TIMESTAMP
       });
@@ -557,7 +557,7 @@
       // Add user to new room
       roomRef.child('users/' + odId).set({
         name: myName,
-        odId: currentUser ? currentUser.odId : null,
+        odId: currentUser ? currentUser.uid : null,
         vote: null,
         joinedAt: firebase.database.ServerValue.TIMESTAMP
       });
