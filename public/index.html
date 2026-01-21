@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planning Poker - Hallucinators</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 10px; color: #00d4ff; }
+    .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+
+    /* Join Form */
+    .join-form {
+      background: rgba(255,255,255,0.05);
+      padding: 40px;
+      border-radius: 16px;
+      max-width: 400px;
+      margin: 50px auto;
+    }
+    .join-form input {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 15px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    .join-form input::placeholder { color: #888; }
+    .join-form button {
+      width: 100%;
+      padding: 14px;
+      background: #00d4ff;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .join-form button:hover { transform: scale(1.02); }
+
+    /* Game Room */
+    .game-room { display: none; }
+    .game-room.active { display: block; }
+
+    .story-section {
+      background: rgba(255,255,255,0.05);
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .story-input {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    .story-label { color: #888; margin-bottom: 8px; display: block; }
+
+    /* Voting Cards */
+    .voting-section { margin-bottom: 30px; }
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+    .card {
+      width: 70px;
+      height: 100px;
+      background: linear-gradient(145deg, #2a2a4a, #1a1a3a);
+      border: 2px solid transparent;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .card:hover { transform: translateY(-5px); border-color: #00d4ff; }
+    .card.selected { background: #00d4ff; color: #1a1a2e; transform: translateY(-5px); }
+
+    /* Participants */
+    .participants-section {
+      background: rgba(255,255,255,0.05);
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .section-title { margin-bottom: 15px; color: #00d4ff; }
+    .participants { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+    .participant {
+      text-align: center;
+      min-width: 80px;
+    }
+    .participant-card {
+      width: 60px;
+      height: 80px;
+      background: linear-gradient(145deg, #3a3a5a, #2a2a4a);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: bold;
+      margin: 0 auto 8px;
+      transition: all 0.3s;
+    }
+    .participant-card.voted { background: #4ade80; color: #1a1a2e; }
+    .participant-card.revealed { background: #00d4ff; color: #1a1a2e; }
+    .participant-name { font-size: 12px; color: #ccc; }
+
+    /* Actions */
+    .actions {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .btn {
+      padding: 14px 30px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .btn:hover { transform: scale(1.05); }
+    .btn-reveal { background: #4ade80; color: #1a1a2e; }
+    .btn-reset { background: #f43f5e; color: #fff; }
+
+    /* Results */
+    .results {
+      text-align: center;
+      margin-top: 20px;
+      padding: 20px;
+      background: rgba(0,212,255,0.1);
+      border-radius: 12px;
+      display: none;
+    }
+    .results.show { display: block; }
+    .results h3 { color: #00d4ff; margin-bottom: 10px; }
+    .average { font-size: 36px; font-weight: bold; }
+
+    /* Room Info */
+    .room-info {
+      text-align: center;
+      padding: 10px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #888;
+    }
+    .room-link { color: #00d4ff; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Planning Poker</h1>
+    <p class="subtitle">Hallucinators Team</p>
+
+    <!-- Join Form -->
+    <div class="join-form" id="joinForm">
+      <input type="text" id="userName" placeholder="Your name" required>
+      <input type="text" id="roomId" placeholder="Room name (e.g., sprint-23)">
+      <button onclick="joinRoom()">Join Room</button>
+    </div>
+
+    <!-- Game Room -->
+    <div class="game-room" id="gameRoom">
+      <div class="room-info">
+        Share this link: <span class="room-link" id="roomLink"></span>
+      </div>
+
+      <div class="story-section">
+        <label class="story-label">Current Story</label>
+        <input type="text" class="story-input" id="storyInput" placeholder="Enter story title or ticket number..." oninput="updateStory()">
+      </div>
+
+      <div class="voting-section">
+        <h3 class="section-title">Your Vote</h3>
+        <div class="cards" id="cards"></div>
+      </div>
+
+      <div class="participants-section">
+        <h3 class="section-title">Team</h3>
+        <div class="participants" id="participants"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-reveal" onclick="reveal()">Reveal Votes</button>
+        <button class="btn btn-reset" onclick="reset()">New Round</button>
+      </div>
+
+      <div class="results" id="results">
+        <h3>Results</h3>
+        <div class="average" id="average"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21, '?', '☕'];
+    let socket;
+    let myVote = null;
+
+    // Initialize cards
+    const cardsContainer = document.getElementById('cards');
+    FIBONACCI.forEach(point => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.textContent = point;
+      card.onclick = () => vote(point);
+      card.dataset.value = point;
+      cardsContainer.appendChild(card);
+    });
+
+    // Check URL for room
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomFromUrl = urlParams.get('room');
+    if (roomFromUrl) {
+      document.getElementById('roomId').value = roomFromUrl;
+    }
+
+    function joinRoom() {
+      const userName = document.getElementById('userName').value.trim();
+      let roomId = document.getElementById('roomId').value.trim() || 'hallucinators-' + Math.random().toString(36).substr(2, 6);
+
+      if (!userName) {
+        alert('Please enter your name');
+        return;
+      }
+
+      socket = io();
+
+      socket.on('connect', () => {
+        socket.emit('join-room', { roomId, userName });
+
+        document.getElementById('joinForm').style.display = 'none';
+        document.getElementById('gameRoom').classList.add('active');
+
+        const roomUrl = `${window.location.origin}?room=${roomId}`;
+        document.getElementById('roomLink').textContent = roomUrl;
+
+        // Update URL
+        window.history.replaceState({}, '', `?room=${roomId}`);
+      });
+
+      socket.on('room-update', (state) => {
+        updateParticipants(state);
+        updateResults(state);
+
+        if (state.story) {
+          document.getElementById('storyInput').value = state.story;
+        }
+
+        // Reset selection if new round
+        if (!state.revealed && myVote !== null) {
+          const hasMyVote = state.users.some(u => u.id === socket.id && u.hasVoted);
+          if (!hasMyVote) {
+            myVote = null;
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+          }
+        }
+      });
+    }
+
+    function vote(points) {
+      if (!socket) return;
+      myVote = points;
+      socket.emit('vote', points);
+
+      document.querySelectorAll('.card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.value == points);
+      });
+    }
+
+    function reveal() {
+      if (socket) socket.emit('reveal');
+    }
+
+    function reset() {
+      if (socket) socket.emit('reset');
+      myVote = null;
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+    }
+
+    function updateStory() {
+      const story = document.getElementById('storyInput').value;
+      if (socket) socket.emit('set-story', story);
+    }
+
+    function updateParticipants(state) {
+      const container = document.getElementById('participants');
+      container.innerHTML = '';
+
+      state.users.forEach(user => {
+        const div = document.createElement('div');
+        div.className = 'participant';
+
+        const card = document.createElement('div');
+        card.className = 'participant-card';
+        if (state.revealed && user.vote !== null) {
+          card.classList.add('revealed');
+          card.textContent = user.vote;
+        } else if (user.hasVoted) {
+          card.classList.add('voted');
+          card.textContent = '✓';
+        } else {
+          card.textContent = '?';
+        }
+
+        const name = document.createElement('div');
+        name.className = 'participant-name';
+        name.textContent = user.name;
+
+        div.appendChild(card);
+        div.appendChild(name);
+        container.appendChild(div);
+      });
+    }
+
+    function updateResults(state) {
+      const resultsDiv = document.getElementById('results');
+      const averageDiv = document.getElementById('average');
+
+      if (state.revealed) {
+        const numericVotes = state.users
+          .map(u => u.vote)
+          .filter(v => typeof v === 'number');
+
+        if (numericVotes.length > 0) {
+          const avg = numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length;
+          averageDiv.textContent = `Average: ${avg.toFixed(1)}`;
+          resultsDiv.classList.add('show');
+        }
+      } else {
+        resultsDiv.classList.remove('show');
+      }
+    }
+  </script>
+</body>
+</html>
