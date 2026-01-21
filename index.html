@@ -22,7 +22,7 @@
       background: rgba(255,255,255,0.05);
       padding: 40px;
       border-radius: 16px;
-      max-width: 400px;
+      max-width: 500px;
       margin: 50px auto;
     }
     .join-form input {
@@ -49,6 +49,38 @@
       transition: transform 0.2s;
     }
     .join-form button:hover { transform: scale(1.02); }
+    .join-form .btn-new-game-home {
+      background: #8b5cf6;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    .section-label { color: #888; margin-bottom: 12px; display: block; font-size: 14px; }
+    .team-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .team-btn {
+      padding: 10px 16px;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid transparent;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .team-btn:hover { border-color: #00d4ff; transform: scale(1.05); }
+    .team-btn.selected { background: #00d4ff; color: #1a1a2e; }
+    .or-divider {
+      text-align: center;
+      color: #666;
+      margin: 15px 0;
+      font-size: 12px;
+    }
+    .custom-name-section { margin-bottom: 15px; }
+    .room-section { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; margin-top: 10px; }
 
     .game-room { display: none; }
     .game-room.active { display: block; }
@@ -172,9 +204,20 @@
     <p class="subtitle">Hallucinators Team</p>
 
     <div class="join-form" id="joinForm">
-      <input type="text" id="userName" placeholder="Your name" required>
-      <input type="text" id="roomId" placeholder="Room name (e.g., sprint-23)">
-      <button onclick="joinRoom()">Join Room</button>
+      <button class="btn-new-game-home" onclick="quickNewGame()">New Game</button>
+
+      <span class="section-label">Pick your name:</span>
+      <div class="team-grid" id="teamGrid"></div>
+
+      <div class="or-divider">— or type your name —</div>
+      <div class="custom-name-section">
+        <input type="text" id="userName" placeholder="Your name">
+      </div>
+
+      <div class="room-section">
+        <input type="text" id="roomId" placeholder="Room code (leave blank for new game)">
+        <button onclick="joinRoom()">Join Room</button>
+      </div>
     </div>
 
     <div class="game-room" id="gameRoom">
@@ -225,10 +268,41 @@
     const db = firebase.database();
 
     const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21, '?', '☕'];
+    const TEAM_MEMBERS = [
+      { name: 'Seng', emoji: '🚀' },
+      { name: 'Rich', emoji: '🎯' },
+      { name: 'KJ', emoji: '⚡' },
+      { name: 'Joe', emoji: '🦊' },
+      { name: 'Amanda', emoji: '🌟' },
+      { name: 'Munduu', emoji: '🔥' },
+      { name: 'Morteza', emoji: '🧠' },
+      { name: 'Foad', emoji: '🎸' },
+      { name: 'Connor', emoji: '🏄' },
+      { name: 'Mark', emoji: '🎨' }
+    ];
+
     let roomRef = null;
     let odId = null;
     let currentRoom = null;
     let myName = null;
+    let selectedTeamMember = null;
+
+    // Initialize team grid
+    const teamGrid = document.getElementById('teamGrid');
+    TEAM_MEMBERS.forEach(member => {
+      const btn = document.createElement('button');
+      btn.className = 'team-btn';
+      btn.textContent = `${member.emoji} ${member.name}`;
+      btn.onclick = () => selectTeamMember(member, btn);
+      teamGrid.appendChild(btn);
+    });
+
+    function selectTeamMember(member, btn) {
+      document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedTeamMember = member;
+      document.getElementById('userName').value = '';
+    }
 
     // Initialize cards
     const cardsContainer = document.getElementById('cards');
@@ -259,12 +333,29 @@
       }, 300);
     });
 
+    function getSelectedName() {
+      const customName = document.getElementById('userName').value.trim();
+      if (customName) return customName;
+      if (selectedTeamMember) return `${selectedTeamMember.emoji} ${selectedTeamMember.name}`;
+      return null;
+    }
+
+    function quickNewGame() {
+      const name = getSelectedName();
+      if (!name) {
+        alert('Please select your name or type one');
+        return;
+      }
+      document.getElementById('roomId').value = '';
+      joinRoom();
+    }
+
     function joinRoom() {
-      const userName = document.getElementById('userName').value.trim();
-      let roomId = document.getElementById('roomId').value.trim() || 'hallucinators-' + Math.random().toString(36).substr(2, 6);
+      const userName = getSelectedName();
+      let roomId = document.getElementById('roomId').value.trim() || 'game-' + Math.random().toString(36).substr(2, 8);
 
       if (!userName) {
-        alert('Please enter your name');
+        alert('Please select your name or type one');
         return;
       }
 
