@@ -138,6 +138,7 @@
     .btn:hover { transform: scale(1.05); }
     .btn-reveal { background: #4ade80; color: #1a1a2e; }
     .btn-reset { background: #f43f5e; color: #fff; }
+    .btn-new-game { background: #8b5cf6; color: #fff; }
 
     .results {
       text-align: center;
@@ -199,6 +200,7 @@
       <div class="actions">
         <button class="btn btn-reveal" onclick="reveal()">Reveal Votes</button>
         <button class="btn btn-reset" onclick="reset()">New Round</button>
+        <button class="btn btn-new-game" onclick="newGame()">New Game</button>
       </div>
 
       <div class="results" id="results">
@@ -403,6 +405,49 @@
           el.classList.remove('copied');
           el.textContent = link;
         }, 1500);
+      });
+    }
+
+    function newGame() {
+      // Leave current room
+      if (roomRef && odId) {
+        roomRef.child('users/' + odId).remove();
+        roomRef.off();
+      }
+
+      // Generate new room ID
+      const newRoomId = 'game-' + Math.random().toString(36).substr(2, 8);
+      currentRoom = newRoomId;
+      roomRef = db.ref('rooms/' + newRoomId);
+
+      // Generate new user ID for this room
+      odId = roomRef.child('users').push().key;
+
+      // Add user to new room
+      roomRef.child('users/' + odId).set({
+        name: myName,
+        vote: null,
+        joinedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+
+      // Remove user on disconnect
+      roomRef.child('users/' + odId).onDisconnect().remove();
+
+      // Update URL
+      const roomUrl = `${window.location.origin}${window.location.pathname}?room=${newRoomId}`;
+      document.getElementById('roomLink').textContent = roomUrl;
+      window.history.replaceState({}, '', `?room=${newRoomId}`);
+
+      // Clear story input
+      document.getElementById('storyInput').value = '';
+
+      // Clear card selection
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+
+      // Listen for new room changes
+      roomRef.on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        updateUI(data);
       });
     }
 
