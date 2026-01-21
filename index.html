@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Planning Poker - Hallucinators</title>
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -17,7 +18,6 @@
     h1 { text-align: center; margin-bottom: 10px; color: #00d4ff; }
     .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
 
-    /* Join Form */
     .join-form {
       background: rgba(255,255,255,0.05);
       padding: 40px;
@@ -50,7 +50,6 @@
     }
     .join-form button:hover { transform: scale(1.02); }
 
-    /* Game Room */
     .game-room { display: none; }
     .game-room.active { display: block; }
 
@@ -71,7 +70,6 @@
     }
     .story-label { color: #888; margin-bottom: 8px; display: block; }
 
-    /* Voting Cards */
     .voting-section { margin-bottom: 30px; }
     .cards {
       display: flex;
@@ -96,7 +94,6 @@
     .card:hover { transform: translateY(-5px); border-color: #00d4ff; }
     .card.selected { background: #00d4ff; color: #1a1a2e; transform: translateY(-5px); }
 
-    /* Participants */
     .participants-section {
       background: rgba(255,255,255,0.05);
       padding: 20px;
@@ -105,10 +102,7 @@
     }
     .section-title { margin-bottom: 15px; color: #00d4ff; }
     .participants { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
-    .participant {
-      text-align: center;
-      min-width: 80px;
-    }
+    .participant { text-align: center; min-width: 80px; }
     .participant-card {
       width: 60px;
       height: 80px;
@@ -126,7 +120,6 @@
     .participant-card.revealed { background: #00d4ff; color: #1a1a2e; }
     .participant-name { font-size: 12px; color: #ccc; }
 
-    /* Actions */
     .actions {
       display: flex;
       gap: 15px;
@@ -146,7 +139,6 @@
     .btn-reveal { background: #4ade80; color: #1a1a2e; }
     .btn-reset { background: #f43f5e; color: #fff; }
 
-    /* Results */
     .results {
       text-align: center;
       margin-top: 20px;
@@ -159,7 +151,6 @@
     .results h3 { color: #00d4ff; margin-bottom: 10px; }
     .average { font-size: 36px; font-weight: bold; }
 
-    /* Room Info */
     .room-info {
       text-align: center;
       padding: 10px;
@@ -169,7 +160,9 @@
       font-size: 14px;
       color: #888;
     }
-    .room-link { color: #00d4ff; word-break: break-all; }
+    .room-link { color: #00d4ff; word-break: break-all; cursor: pointer; }
+    .room-link:hover { text-decoration: underline; }
+    .copied { color: #4ade80; }
   </style>
 </head>
 <body>
@@ -177,22 +170,20 @@
     <h1>Planning Poker</h1>
     <p class="subtitle">Hallucinators Team</p>
 
-    <!-- Join Form -->
     <div class="join-form" id="joinForm">
       <input type="text" id="userName" placeholder="Your name" required>
       <input type="text" id="roomId" placeholder="Room name (e.g., sprint-23)">
       <button onclick="joinRoom()">Join Room</button>
     </div>
 
-    <!-- Game Room -->
     <div class="game-room" id="gameRoom">
       <div class="room-info">
-        Share this link: <span class="room-link" id="roomLink"></span>
+        Share this link: <span class="room-link" id="roomLink" onclick="copyLink()"></span>
       </div>
 
       <div class="story-section">
         <label class="story-label">Current Story</label>
-        <input type="text" class="story-input" id="storyInput" placeholder="Enter story title or ticket number..." oninput="updateStory()">
+        <input type="text" class="story-input" id="storyInput" placeholder="Enter story title or ticket number...">
       </div>
 
       <div class="voting-section">
@@ -218,9 +209,24 @@
   </div>
 
   <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBwI5gYt7NPCZZot9eRtsXmNzv4WalTQCY",
+      authDomain: "planning-poker-d12a0.firebaseapp.com",
+      databaseURL: "https://planning-poker-d12a0-default-rtdb.firebaseio.com",
+      projectId: "planning-poker-d12a0",
+      storageBucket: "planning-poker-d12a0.firebasestorage.app",
+      messagingSenderId: "885476807167",
+      appId: "1:885476807167:web:1bf537187fc9073b17d7ca"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21, '?', '☕'];
-    let socket;
-    let myVote = null;
+    let roomRef = null;
+    let odId = null;
+    let currentRoom = null;
+    let myName = null;
 
     // Initialize cards
     const cardsContainer = document.getElementById('cards');
@@ -240,6 +246,17 @@
       document.getElementById('roomId').value = roomFromUrl;
     }
 
+    // Story input debounce
+    let storyTimeout;
+    document.getElementById('storyInput').addEventListener('input', (e) => {
+      clearTimeout(storyTimeout);
+      storyTimeout = setTimeout(() => {
+        if (roomRef) {
+          roomRef.child('story').set(e.target.value);
+        }
+      }, 300);
+    });
+
     function joinRoom() {
       const userName = document.getElementById('userName').value.trim();
       let roomId = document.getElementById('roomId').value.trim() || 'hallucinators-' + Math.random().toString(36).substr(2, 6);
@@ -249,79 +266,65 @@
         return;
       }
 
-      socket = io();
+      myName = userName;
+      currentRoom = roomId;
+      roomRef = db.ref('rooms/' + roomId);
 
-      socket.on('connect', () => {
-        socket.emit('join-room', { roomId, userName });
+      // Generate unique user ID
+      odId = roomRef.child('users').push().key;
 
-        document.getElementById('joinForm').style.display = 'none';
-        document.getElementById('gameRoom').classList.add('active');
-
-        const roomUrl = `${window.location.origin}?room=${roomId}`;
-        document.getElementById('roomLink').textContent = roomUrl;
-
-        // Update URL
-        window.history.replaceState({}, '', `?room=${roomId}`);
+      // Add user to room
+      roomRef.child('users/' + odId).set({
+        name: userName,
+        vote: null,
+        joinedAt: firebase.database.ServerValue.TIMESTAMP
       });
 
-      socket.on('room-update', (state) => {
-        updateParticipants(state);
-        updateResults(state);
+      // Remove user on disconnect
+      roomRef.child('users/' + odId).onDisconnect().remove();
 
-        if (state.story) {
-          document.getElementById('storyInput').value = state.story;
-        }
+      // Show game room
+      document.getElementById('joinForm').style.display = 'none';
+      document.getElementById('gameRoom').classList.add('active');
 
-        // Reset selection if new round
-        if (!state.revealed && myVote !== null) {
-          const hasMyVote = state.users.some(u => u.id === socket.id && u.hasVoted);
-          if (!hasMyVote) {
-            myVote = null;
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-          }
-        }
+      const roomUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+      document.getElementById('roomLink').textContent = roomUrl;
+      window.history.replaceState({}, '', `?room=${roomId}`);
+
+      // Listen for room changes
+      roomRef.on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        updateUI(data);
       });
     }
 
-    function vote(points) {
-      if (!socket) return;
-      myVote = points;
-      socket.emit('vote', points);
+    function updateUI(data) {
+      const users = data.users || {};
+      const revealed = data.revealed || false;
+      const story = data.story || '';
 
-      document.querySelectorAll('.card').forEach(card => {
-        card.classList.toggle('selected', card.dataset.value == points);
-      });
-    }
+      // Update story input (only if different to avoid cursor jump)
+      const storyInput = document.getElementById('storyInput');
+      if (document.activeElement !== storyInput && storyInput.value !== story) {
+        storyInput.value = story;
+      }
 
-    function reveal() {
-      if (socket) socket.emit('reveal');
-    }
-
-    function reset() {
-      if (socket) socket.emit('reset');
-      myVote = null;
-      document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-    }
-
-    function updateStory() {
-      const story = document.getElementById('storyInput').value;
-      if (socket) socket.emit('set-story', story);
-    }
-
-    function updateParticipants(state) {
+      // Update participants
       const container = document.getElementById('participants');
       container.innerHTML = '';
 
-      state.users.forEach(user => {
+      const userList = Object.entries(users);
+      userList.forEach(([id, user]) => {
         const div = document.createElement('div');
         div.className = 'participant';
 
         const card = document.createElement('div');
         card.className = 'participant-card';
-        if (state.revealed && user.vote !== null) {
+
+        if (revealed && user.vote !== null) {
           card.classList.add('revealed');
           card.textContent = user.vote;
-        } else if (user.hasVoted) {
+        } else if (user.vote !== null) {
           card.classList.add('voted');
           card.textContent = '✓';
         } else {
@@ -330,20 +333,27 @@
 
         const name = document.createElement('div');
         name.className = 'participant-name';
-        name.textContent = user.name;
+        name.textContent = user.name + (id === odId ? ' (you)' : '');
 
         div.appendChild(card);
         div.appendChild(name);
         container.appendChild(div);
       });
-    }
 
-    function updateResults(state) {
+      // Update card selection
+      const myUser = users[odId];
+      if (myUser) {
+        document.querySelectorAll('.card').forEach(card => {
+          card.classList.toggle('selected', String(card.dataset.value) === String(myUser.vote));
+        });
+      }
+
+      // Update results
       const resultsDiv = document.getElementById('results');
       const averageDiv = document.getElementById('average');
 
-      if (state.revealed) {
-        const numericVotes = state.users
+      if (revealed) {
+        const numericVotes = Object.values(users)
           .map(u => u.vote)
           .filter(v => typeof v === 'number');
 
@@ -356,6 +366,52 @@
         resultsDiv.classList.remove('show');
       }
     }
+
+    function vote(points) {
+      if (!roomRef || !odId) return;
+      roomRef.child('users/' + odId + '/vote').set(points);
+    }
+
+    function reveal() {
+      if (roomRef) {
+        roomRef.child('revealed').set(true);
+      }
+    }
+
+    function reset() {
+      if (!roomRef) return;
+      roomRef.once('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const users = data.users || {};
+
+        const updates = { revealed: false };
+        Object.keys(users).forEach(id => {
+          updates['users/' + id + '/vote'] = null;
+        });
+
+        roomRef.update(updates);
+      });
+    }
+
+    function copyLink() {
+      const link = document.getElementById('roomLink').textContent;
+      navigator.clipboard.writeText(link).then(() => {
+        const el = document.getElementById('roomLink');
+        el.classList.add('copied');
+        el.textContent = 'Copied!';
+        setTimeout(() => {
+          el.classList.remove('copied');
+          el.textContent = link;
+        }, 1500);
+      });
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (roomRef && odId) {
+        roomRef.child('users/' + odId).remove();
+      }
+    });
   </script>
 </body>
 </html>
