@@ -49,37 +49,21 @@
       transition: transform 0.2s;
     }
     .join-form button:hover { transform: scale(1.02); }
-    .join-form .btn-new-game-home {
-      background: #8b5cf6;
-      color: #fff;
-      margin-bottom: 20px;
-    }
-    .section-label { color: #888; margin-bottom: 12px; display: block; font-size: 14px; }
-    .team-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    .team-btn {
-      padding: 10px 16px;
-      background: rgba(255,255,255,0.1);
-      border: 2px solid transparent;
+    .section-label { color: #888; margin-bottom: 8px; display: block; font-size: 14px; }
+    .name-select {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 15px;
+      border: none;
       border-radius: 8px;
+      font-size: 16px;
+      background: rgba(255,255,255,0.1);
       color: #fff;
-      font-size: 14px;
       cursor: pointer;
-      transition: all 0.2s;
     }
-    .team-btn:hover { border-color: #00d4ff; transform: scale(1.05); }
-    .team-btn.selected { background: #00d4ff; color: #1a1a2e; }
-    .or-divider {
-      text-align: center;
-      color: #666;
-      margin: 15px 0;
-      font-size: 12px;
-    }
-    .custom-name-section { margin-bottom: 15px; }
+    .name-select option { background: #1a1a2e; color: #fff; }
+    .custom-name-section { display: none; margin-bottom: 15px; }
+    .custom-name-section.show { display: block; }
     .room-section { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; margin-top: 10px; }
 
     .game-room { display: none; }
@@ -204,19 +188,18 @@
     <p class="subtitle">Hallucinators Team</p>
 
     <div class="join-form" id="joinForm">
-      <button class="btn-new-game-home" onclick="quickNewGame()">New Game</button>
+      <span class="section-label">Who are you?</span>
+      <select class="name-select" id="nameSelect" onchange="onNameSelect()">
+        <option value="">Select your name...</option>
+      </select>
 
-      <span class="section-label">Pick your name:</span>
-      <div class="team-grid" id="teamGrid"></div>
-
-      <div class="or-divider">— or type your name —</div>
-      <div class="custom-name-section">
-        <input type="text" id="userName" placeholder="Your name">
+      <div class="custom-name-section" id="customNameSection">
+        <input type="text" id="userName" placeholder="Enter your name">
       </div>
 
       <div class="room-section">
-        <input type="text" id="roomId" placeholder="Room code (leave blank for new game)">
-        <button onclick="joinRoom()">Join Room</button>
+        <input type="text" id="roomId" placeholder="Room code (optional)">
+        <button onclick="joinRoom()">Join / Create Game</button>
       </div>
     </div>
 
@@ -285,23 +268,30 @@
     let odId = null;
     let currentRoom = null;
     let myName = null;
-    let selectedTeamMember = null;
 
-    // Initialize team grid
-    const teamGrid = document.getElementById('teamGrid');
+    // Initialize name dropdown
+    const nameSelect = document.getElementById('nameSelect');
     TEAM_MEMBERS.forEach(member => {
-      const btn = document.createElement('button');
-      btn.className = 'team-btn';
-      btn.textContent = `${member.emoji} ${member.name}`;
-      btn.onclick = () => selectTeamMember(member, btn);
-      teamGrid.appendChild(btn);
+      const option = document.createElement('option');
+      option.value = `${member.emoji} ${member.name}`;
+      option.textContent = `${member.emoji} ${member.name}`;
+      nameSelect.appendChild(option);
     });
+    const otherOption = document.createElement('option');
+    otherOption.value = '__other__';
+    otherOption.textContent = '✏️ Other...';
+    nameSelect.appendChild(otherOption);
 
-    function selectTeamMember(member, btn) {
-      document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedTeamMember = member;
-      document.getElementById('userName').value = '';
+    function onNameSelect() {
+      const val = nameSelect.value;
+      const customSection = document.getElementById('customNameSection');
+      if (val === '__other__') {
+        customSection.classList.add('show');
+        document.getElementById('userName').focus();
+      } else {
+        customSection.classList.remove('show');
+        document.getElementById('userName').value = '';
+      }
     }
 
     // Initialize cards
@@ -334,20 +324,11 @@
     });
 
     function getSelectedName() {
-      const customName = document.getElementById('userName').value.trim();
-      if (customName) return customName;
-      if (selectedTeamMember) return `${selectedTeamMember.emoji} ${selectedTeamMember.name}`;
-      return null;
-    }
-
-    function quickNewGame() {
-      const name = getSelectedName();
-      if (!name) {
-        alert('Please select your name or type one');
-        return;
+      const selectVal = nameSelect.value;
+      if (selectVal === '__other__') {
+        return document.getElementById('userName').value.trim() || null;
       }
-      document.getElementById('roomId').value = '';
-      joinRoom();
+      return selectVal || null;
     }
 
     function joinRoom() {
