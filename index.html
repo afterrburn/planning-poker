@@ -395,12 +395,12 @@
         const card = document.createElement('div');
         card.className = 'participant-card';
 
-        if (revealed && user.vote !== null) {
+        if (revealed === true && user.vote !== null) {
           card.classList.add('revealed');
           card.textContent = user.vote;
         } else if (user.vote !== null) {
           card.classList.add('voted');
-          card.textContent = '✓';
+          card.textContent = '🃏';
         } else {
           card.textContent = '?';
         }
