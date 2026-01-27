@@ -24,7 +24,7 @@ jobs:
       - name: Build for staging
         run: npm run build
         env:
-          VITE_ENV: staging
+          VITE_BASE_PATH: /planning-poker-staging/
 
       - name: Deploy to staging repo
         uses: peaceiris/actions-gh-pages@v4

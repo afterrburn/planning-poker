@@ -6,7 +6,7 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/planning-poker/',
+  base: process.env.VITE_BASE_PATH || '/planning-poker/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
