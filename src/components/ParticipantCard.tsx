@@ -16,7 +16,7 @@ interface ParticipantCardProps {
 
 export function ParticipantCard({ user, odId, isCurrentUser, revealed, isNudged, onNudge }: ParticipantCardProps) {
   const [justNudged, setJustNudged] = useState(false)
-  const hasVoted = user.vote !== null
+  const hasVoted = user.vote != null
   const canNudge = !hasVoted && !isCurrentUser && !revealed && onNudge
 
   const handleNudge = () => {
