@@ -85,6 +85,13 @@ export function GameRoom({
   const voters = userEntries.filter(([, user]) => user.role !== 'spectator')
   const allVoted = voters.length > 0 && voters.every(([, user]) => user.vote != null)
 
+  // Auto-reveal when everyone has voted
+  useEffect(() => {
+    if (allVoted && !roomData.revealed) {
+      onReveal()
+    }
+  }, [allVoted, roomData.revealed, onReveal])
+
   const handleTimerEnd = useCallback(() => {
     if (!roomData.revealed) {
       onReveal()

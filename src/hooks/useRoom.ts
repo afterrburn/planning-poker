@@ -119,8 +119,12 @@ export function useRoom(): UseRoomReturn {
 
   const reveal = useCallback(() => {
     if (!roomRefPath.current) return
-    const revealedRef = ref(db, `${roomRefPath.current}/revealed`)
-    set(revealedRef, true)
+    const roomRef = ref(db, roomRefPath.current)
+    update(roomRef, {
+      revealed: true,
+      timerEndsAt: null,
+      timerDuration: null,
+    })
   }, [])
 
   const resetVotes = useCallback(() => {
