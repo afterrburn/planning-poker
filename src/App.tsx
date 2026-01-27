@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Toaster } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { useRoom, UserRole } from '@/hooks/useRoom'
+import { useNotifications } from '@/hooks/useNotifications'
 import { LoginScreen } from '@/components/LoginScreen'
 import { JoinForm } from '@/components/JoinForm'
 import { GameRoom } from '@/components/GameRoom'
@@ -11,6 +12,8 @@ type AppState = 'loading' | 'login' | 'join' | 'game'
 
 function App() {
   const { user, loading: authLoading, error: authError, signIn, signOut } = useAuth()
+  const { requestPermission } = useNotifications()
+  const hasRequestedPermission = useRef(false)
   const {
     roomData,
     localUserId,
@@ -35,6 +38,14 @@ function App() {
       setInitialRoomCode(roomFromUrl)
     }
   }, [])
+
+  // Request notification permission when user logs in
+  useEffect(() => {
+    if (user && !hasRequestedPermission.current) {
+      hasRequestedPermission.current = true
+      requestPermission()
+    }
+  }, [user, requestPermission])
 
   const handleJoin = useCallback(
     (roomCode: string, role: UserRole) => {

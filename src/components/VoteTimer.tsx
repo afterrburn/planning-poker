@@ -22,7 +22,7 @@ export function VoteTimer({
 }: VoteTimerProps) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [selectedDuration, setSelectedDuration] = useState(60)
-  const { permission, requestPermission, notify } = useNotifications()
+  const { permission, enabled, setEnabled, requestPermission, notify } = useNotifications()
   const hasNotified10s = useRef(false)
   const hasNotifiedEnd = useRef(false)
   const timerEndedRef = useRef(false)
@@ -142,7 +142,25 @@ export function VoteTimer({
         </>
       )}
 
-      {permission !== 'granted' ? (
+      {permission === 'granted' ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setEnabled(!enabled)}
+          className="text-[hsl(var(--muted-foreground))]"
+          title={enabled ? 'Disable notifications' : 'Enable notifications'}
+        >
+          {enabled ? (
+            <Bell className="h-4 w-4" />
+          ) : (
+            <BellOff className="h-4 w-4" />
+          )}
+        </Button>
+      ) : permission === 'denied' ? (
+        <span title="Notifications blocked in browser settings">
+          <BellOff className="h-4 w-4 text-[hsl(var(--muted-foreground))] opacity-50" />
+        </span>
+      ) : (
         <Button
           variant="ghost"
           size="sm"
@@ -152,10 +170,6 @@ export function VoteTimer({
         >
           <BellOff className="h-4 w-4" />
         </Button>
-      ) : (
-        <span title="Notifications enabled">
-          <Bell className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-        </span>
       )}
     </div>
   )
