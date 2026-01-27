@@ -126,7 +126,11 @@ export function useRoom(): UseRoomReturn {
   const resetVotes = useCallback(() => {
     if (!roomRefPath.current || !roomData) return
 
-    const updates: Record<string, unknown> = { revealed: false }
+    const updates: Record<string, unknown> = {
+      revealed: false,
+      timerEndsAt: null,
+      timerDuration: null,
+    }
     Object.keys(roomData.users).forEach((userId) => {
       updates[`users/${userId}/vote`] = null
     })
