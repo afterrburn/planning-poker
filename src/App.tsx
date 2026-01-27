@@ -22,6 +22,7 @@ function App() {
     vote,
     reveal,
     resetVotes,
+    newRound,
     updateStory,
     startTimer,
     stopTimer,
@@ -137,7 +138,8 @@ function App() {
             user={user}
             onVote={handleVote}
             onReveal={reveal}
-            onReset={resetVotes}
+            onRevote={resetVotes}
+            onNewRound={newRound}
             onLeave={handleLeaveRoom}
             onStoryChange={updateStory}
             onStartTimer={startTimer}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { User } from 'firebase/auth'
 import { toast } from 'sonner'
-import { Copy, Eye, RotateCcw, DoorOpen, Users } from 'lucide-react'
+import { Copy, Eye, RotateCcw, RefreshCw, DoorOpen, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,8 @@ interface GameRoomProps {
   user: User
   onVote: (value: VoteValue) => void
   onReveal: () => void
-  onReset: () => void
+  onRevote: () => void
+  onNewRound: () => void
   onLeave: () => void
   onStoryChange: (story: string) => void
   onStartTimer: (duration: number) => void
@@ -33,7 +34,8 @@ export function GameRoom({
   localUserId,
   onVote,
   onReveal,
-  onReset,
+  onRevote,
+  onNewRound,
   onLeave,
   onStoryChange,
   onStartTimer,
@@ -185,7 +187,13 @@ export function GameRoom({
                 <Eye className="mr-2 h-4 w-4" />
                 Reveal
               </Button>
-              <Button variant="outline" size="default" onClick={onReset}>
+              {roomData.revealed && (
+                <Button variant="secondary" size="default" onClick={onRevote}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Re-vote
+                </Button>
+              )}
+              <Button variant="outline" size="default" onClick={onNewRound}>
                 <RotateCcw className="mr-2 h-4 w-4" />
                 New Round
               </Button>

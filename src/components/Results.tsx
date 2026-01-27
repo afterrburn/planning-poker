@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { PartyPopper } from 'lucide-react'
 import { RoomUser } from '@/hooks/useRoom'
 import { Card, CardContent } from '@/components/ui/card'
 import { VoteValue } from '@/lib/firebase'
@@ -54,6 +55,10 @@ export function Results({ users, revealed }: ResultsProps) {
     return aVal - bVal
   })
 
+  // Check for consensus - all voters voted the same
+  const votedVoters = voters.filter(u => u.vote != null)
+  const hasConsensus = votedVoters.length > 1 && voteGroups.length === 1
+
   return (
     <AnimatePresence>
       {revealed && voters.length > 0 && (
@@ -63,6 +68,20 @@ export function Results({ users, revealed }: ResultsProps) {
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
         >
+          {hasConsensus && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, type: 'spring' }}
+              className="mb-4 flex items-center justify-center gap-3 rounded-lg bg-green-500/20 border border-green-500/40 py-4 px-6"
+            >
+              <PartyPopper className="h-6 w-6 text-green-400" />
+              <span className="text-lg font-semibold text-green-400">
+                Consensus! Everyone voted {voteGroups[0]?.vote}
+              </span>
+              <PartyPopper className="h-6 w-6 text-green-400" />
+            </motion.div>
+          )}
           <Card className="border-[hsl(var(--primary))]/30 bg-[hsl(var(--primary))]/10">
             <CardContent className="py-6">
               <div className="flex flex-col md:flex-row gap-6">

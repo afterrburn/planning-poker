@@ -30,6 +30,7 @@ interface UseRoomReturn {
   vote: (value: VoteValue) => void
   reveal: () => void
   resetVotes: () => void
+  newRound: () => void
   updateStory: (story: string) => void
   createNewGame: (user: User, role?: UserRole) => string
   startTimer: (durationSeconds: number) => void
@@ -143,6 +144,23 @@ export function useRoom(): UseRoomReturn {
     update(roomRef, updates)
   }, [roomData])
 
+  const newRound = useCallback(() => {
+    if (!roomRefPath.current || !roomData) return
+
+    const updates: Record<string, unknown> = {
+      revealed: false,
+      timerEndsAt: null,
+      timerDuration: null,
+      story: '',
+    }
+    Object.keys(roomData.users).forEach((userId) => {
+      updates[`users/${userId}/vote`] = null
+    })
+
+    const roomRef = ref(db, roomRefPath.current)
+    update(roomRef, updates)
+  }, [roomData])
+
   const updateStory = useCallback((story: string) => {
     if (!roomRefPath.current) return
     const storyRef = ref(db, `${roomRefPath.current}/story`)
@@ -197,6 +215,7 @@ export function useRoom(): UseRoomReturn {
     vote,
     reveal,
     resetVotes,
+    newRound,
     updateStory,
     createNewGame,
     startTimer,
