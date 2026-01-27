@@ -1,5 +1,9 @@
 name: Deploy to GitHub Pages
 
+# IMPORTANT: GitHub Pages must be configured with build_type: workflow
+# Go to Settings > Pages > Build and deployment > Source: "GitHub Actions"
+# If set to "Deploy from a branch", the raw source files will be served instead of the built app
+
 on:
   push:
     branches: [main]
@@ -32,6 +36,14 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Verify build output
+        run: |
+          if grep -q 'src="/src/main.tsx"' dist/index.html; then
+            echo "ERROR: Build output contains source reference instead of bundled assets"
+            exit 1
+          fi
+          echo "Build output verified - contains bundled assets"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
