@@ -27,6 +27,8 @@ function App() {
     startTimer,
     stopTimer,
     changeRole,
+    sendReaction,
+    nudge,
   } = useRoom()
 
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null)
@@ -145,6 +147,8 @@ function App() {
             onStartTimer={startTimer}
             onStopTimer={stopTimer}
             onChangeRole={changeRole}
+            onSendReaction={sendReaction}
+            onNudge={nudge}
           />
         )}
       </div>

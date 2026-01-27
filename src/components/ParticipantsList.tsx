@@ -7,9 +7,10 @@ interface ParticipantsListProps {
   users: Record<string, RoomUser>
   localUserId: string | null
   revealed: boolean
+  onNudge: (userId: string) => void
 }
 
-export function ParticipantsList({ users, localUserId, revealed }: ParticipantsListProps) {
+export function ParticipantsList({ users, localUserId, revealed, onNudge }: ParticipantsListProps) {
   const userEntries = Object.entries(users)
   const voters = userEntries.filter(([, user]) => user.role !== 'spectator')
   const spectators = userEntries.filter(([, user]) => user.role === 'spectator')
@@ -26,14 +27,20 @@ export function ParticipantsList({ users, localUserId, revealed }: ParticipantsL
       <VoteProgress voted={votedCount} total={totalCount} />
 
       <div className="flex flex-wrap justify-center gap-4 pt-2">
-        {voters.map(([id, user]) => (
-          <ParticipantCard
-            key={id}
-            user={user}
-            isCurrentUser={id === localUserId}
-            revealed={revealed}
-          />
-        ))}
+        {voters.map(([id, user]) => {
+          const isNudged = user.nudgedAt ? Date.now() - user.nudgedAt < 2000 : false
+          return (
+            <ParticipantCard
+              key={id}
+              user={user}
+              odId={id}
+              isCurrentUser={id === localUserId}
+              revealed={revealed}
+              isNudged={isNudged}
+              onNudge={onNudge}
+            />
+          )
+        })}
       </div>
 
       {spectators.length > 0 && (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { User } from 'firebase/auth'
 import { toast } from 'sonner'
-import { Copy, Eye, RotateCcw, RefreshCw, DoorOpen, Users } from 'lucide-react'
+import { Copy, Eye, RotateCcw, RefreshCw, DoorOpen, Users, Keyboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -9,8 +9,17 @@ import { VotingCards } from './VotingCards'
 import { ParticipantsList } from './ParticipantsList'
 import { Results } from './Results'
 import { VoteTimer } from './VoteTimer'
+import { EmojiReactions } from './EmojiReactions'
 import { RoomData, UserRole } from '@/hooks/useRoom'
-import { VoteValue } from '@/lib/firebase'
+import { VoteValue, FIBONACCI } from '@/lib/firebase'
+
+// Keyboard shortcut mapping: key -> card index
+const KEY_TO_CARD: Record<string, number> = {
+  '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, // 0, 1, 2, 3, 5
+  '5': 5, '6': 6, '7': 7,                  // 8, 13, 21
+  '?': 8, '/': 8,                          // ?
+  'c': 9,                                  // ☕
+}
 
 interface GameRoomProps {
   roomId: string
@@ -26,6 +35,8 @@ interface GameRoomProps {
   onStartTimer: (duration: number) => void
   onStopTimer: () => void
   onChangeRole: (role: UserRole) => void
+  onSendReaction: (emoji: string) => void
+  onNudge: (userId: string) => void
 }
 
 export function GameRoom({
@@ -41,8 +52,11 @@ export function GameRoom({
   onStartTimer,
   onStopTimer,
   onChangeRole,
+  onSendReaction,
+  onNudge,
 }: GameRoomProps) {
   const [localStory, setLocalStory] = useState(roomData.story)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const storyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -94,11 +108,70 @@ export function GameRoom({
     }
   }, [allVoted, roomData.revealed, onReveal])
 
+  // Nudge notification for current user
+  const lastNudgeRef = useRef<number>(0)
+  useEffect(() => {
+    if (!currentUser?.nudgedAt) return
+    if (currentUser.nudgedAt > lastNudgeRef.current) {
+      lastNudgeRef.current = currentUser.nudgedAt
+      toast('👋 Someone nudged you to vote!', { duration: 2000 })
+    }
+  }, [currentUser?.nudgedAt])
+
   const handleTimerEnd = useCallback(() => {
     if (!roomData.revealed) {
       onReveal()
     }
   }, [roomData.revealed, onReveal])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      const key = e.key.toLowerCase()
+
+      // Voting shortcuts (0-7, ?, c)
+      if (!isSpectator && !roomData.revealed && key in KEY_TO_CARD) {
+        const cardIndex = KEY_TO_CARD[key]
+        if (cardIndex < FIBONACCI.length) {
+          onVote(FIBONACCI[cardIndex])
+          toast.success(`Voted ${FIBONACCI[cardIndex]}`, { duration: 1000 })
+        }
+        return
+      }
+
+      // R - Reveal
+      if (key === 'r' && !roomData.revealed) {
+        onReveal()
+        return
+      }
+
+      // V - Re-vote (when revealed)
+      if (key === 'v' && roomData.revealed) {
+        onRevote()
+        return
+      }
+
+      // N - New round
+      if (key === 'n') {
+        onNewRound()
+        return
+      }
+
+      // K - Toggle shortcuts help
+      if (key === 'k') {
+        setShowShortcuts(s => !s)
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isSpectator, roomData.revealed, onVote, onReveal, onRevote, onNewRound])
 
   return (
     <div className="space-y-6">
@@ -168,9 +241,15 @@ export function GameRoom({
             users={roomData.users}
             localUserId={localUserId}
             revealed={roomData.revealed}
+            onNudge={onNudge}
           />
         </CardContent>
       </Card>
+
+      <EmojiReactions
+        reactions={roomData.reactions}
+        onSendReaction={onSendReaction}
+      />
 
       <Card>
         <CardContent className="py-4">
@@ -203,6 +282,36 @@ export function GameRoom({
       </Card>
 
       <Results users={roomData.users} revealed={roomData.revealed} />
+
+      {/* Keyboard shortcuts toggle */}
+      <div className="flex justify-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowShortcuts(s => !s)}
+          className="text-[hsl(var(--muted-foreground))] text-xs"
+        >
+          <Keyboard className="mr-1 h-3 w-3" />
+          Shortcuts (K)
+        </Button>
+      </div>
+
+      {showShortcuts && (
+        <Card className="border-[hsl(var(--muted))]/50">
+          <CardContent className="py-4">
+            <h4 className="mb-3 text-sm font-semibold text-[hsl(var(--muted-foreground))]">Keyboard Shortcuts</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+              <div><kbd className="px-1.5 py-0.5 bg-[hsl(var(--muted))] rounded text-xs">0-7</kbd> Vote cards</div>
+              <div><kbd className="px-1.5 py-0.5 bg-[hsl(var(--muted))] rounded text-xs">?</kbd> Vote ?</div>
+              <div><kbd className="px-1.5 py-0.5 bg-[hsl(var(--muted))] rounded text-xs">C</kbd> Vote ☕</div>
+              <div><kbd className="px-1.5 py-0.5 bg-[hsl(var(--muted))] rounded text-xs">R</kbd> Reveal</div>
+              <div><kbd className="px-1.5 py-0.5 bg-[hsl(var(--muted))] rounded text-xs">V</kbd> Re-vote</div>
+              <div><kbd className="px-1.5 py-0.5 bg-[hsl(var(--muted))] rounded text-xs">N</kbd> New round</div>
+              <div><kbd className="px-1.5 py-0.5 bg-[hsl(var(--muted))] rounded text-xs">K</kbd> Toggle help</div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

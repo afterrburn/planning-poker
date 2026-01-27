@@ -5,6 +5,13 @@ import { User } from 'firebase/auth'
 
 export type UserRole = 'voter' | 'spectator'
 
+export interface Reaction {
+  id: string
+  emoji: string
+  userName: string
+  timestamp: number
+}
+
 export interface RoomUser {
   name: string
   odId: string
@@ -12,6 +19,7 @@ export interface RoomUser {
   joinedAt: number
   photoURL?: string
   role: UserRole
+  nudgedAt?: number
 }
 
 export interface RoomData {
@@ -20,6 +28,7 @@ export interface RoomData {
   story: string
   timerEndsAt: number | null
   timerDuration: number | null
+  reactions: Reaction[]
 }
 
 interface UseRoomReturn {
@@ -36,6 +45,8 @@ interface UseRoomReturn {
   startTimer: (durationSeconds: number) => void
   stopTimer: () => void
   changeRole: (role: UserRole) => void
+  sendReaction: (emoji: string) => void
+  nudge: (userId: string) => void
 }
 
 export function useRoom(): UseRoomReturn {
@@ -43,6 +54,7 @@ export function useRoom(): UseRoomReturn {
   const [localUserId, setLocalUserId] = useState<string | null>(null)
   const roomRefPath = useRef<string | null>(null)
   const currentRoomId = useRef<string | null>(null)
+  const currentUserName = useRef<string>('Anonymous')
 
   const cleanup = useCallback(() => {
     if (roomRefPath.current) {
@@ -70,6 +82,7 @@ export function useRoom(): UseRoomReturn {
     setLocalUserId(userId)
 
     const userName = user.displayName || user.email?.split('@')[0] || 'Anonymous'
+    currentUserName.current = userName
 
     set(newUserRef, {
       name: userName,
@@ -85,12 +98,20 @@ export function useRoom(): UseRoomReturn {
     onValue(roomRef, (snapshot) => {
       const data = snapshot.val()
       if (data) {
+        // Parse reactions from Firebase object to array
+        const reactionsObj = data.reactions || {}
+        const reactions: Reaction[] = Object.entries(reactionsObj).map(([id, r]) => ({
+          id,
+          ...(r as Omit<Reaction, 'id'>),
+        }))
+
         setRoomData({
           users: data.users || {},
           revealed: data.revealed === true,
           story: data.story || '',
           timerEndsAt: data.timerEndsAt || null,
           timerDuration: data.timerDuration || null,
+          reactions,
         })
       } else {
         setRoomData({
@@ -99,6 +120,7 @@ export function useRoom(): UseRoomReturn {
           story: '',
           timerEndsAt: null,
           timerDuration: null,
+          reactions: [],
         })
       }
     })
@@ -198,6 +220,33 @@ export function useRoom(): UseRoomReturn {
     })
   }, [])
 
+  const sendReaction = useCallback((emoji: string) => {
+    if (!roomRefPath.current) return
+    const reactionsRef = ref(db, `${roomRefPath.current}/reactions`)
+    const newReactionRef = push(reactionsRef)
+    set(newReactionRef, {
+      emoji,
+      userName: currentUserName.current,
+      timestamp: Date.now(),
+    })
+
+    // Auto-cleanup old reactions after 5 seconds
+    setTimeout(() => {
+      set(newReactionRef, null)
+    }, 5000)
+  }, [])
+
+  const nudge = useCallback((userId: string) => {
+    if (!roomRefPath.current) return
+    const nudgeRef = ref(db, `${roomRefPath.current}/users/${userId}/nudgedAt`)
+    set(nudgeRef, Date.now())
+
+    // Clear nudge after 2 seconds
+    setTimeout(() => {
+      set(nudgeRef, null)
+    }, 2000)
+  }, [])
+
   useEffect(() => {
     return () => {
       if (roomRefPath.current && localUserId) {
@@ -221,5 +270,7 @@ export function useRoom(): UseRoomReturn {
     startTimer,
     stopTimer,
     changeRole,
+    sendReaction,
+    nudge,
   }
 }
