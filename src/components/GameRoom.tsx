@@ -223,6 +223,16 @@ export function GameRoom({
             </div>
           </CardContent>
         </Card>
+      ) : roomData.revealed && currentUserVote == null ? (
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex flex-col items-center gap-3 text-[hsl(var(--muted-foreground))]">
+              <Eye className="h-8 w-8" />
+              <p>Cards are already revealed for this round</p>
+              <p className="text-sm">Wait for a new round to vote</p>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardContent className="py-6">
